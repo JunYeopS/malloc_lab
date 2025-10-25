@@ -24,23 +24,53 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "ateam",
+    "Team 8: ",
     /* First member's full name */
-    "Harry Bovik",
+    "JunyeopS",
     /* First member's email address */
-    "bovik@cs.cmu.edu",
+    "wnsduq6291@gmail.com",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
     ""};
 
 /* single word (4) or double word (8) alignment */
-#define ALIGNMENT 8
+#define ALIGNMENT 8 // 정렬 단위 
 
 /* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~0x7)
+#define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~0x7) //정렬을 위한 패딩 작업 
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+
+/* 단위(word) 크기 정의 */
+#define WSIZE       4           // word = 4바이트 (헤더/풋터 크기)
+#define DSIZE       8           // double word = 8바이트 (정렬 단위)
+
+/* 힙을 한 번 확장할 때 기본 크기 (초기 힙 크기 단위) */
+#define CHUNKSIZE   (1 << 12)   // 4096바이트 (4KB 단위로 힙 확장)
+
+/* 크기와 할당 비트를 하나의 값으로 묶어서 저장 */
+#define PACK(size, alloc)  ((size) | (alloc))  
+// ex) 헤더에 크기(size)와 할당 여부(alloc: 0 또는 1)를 합쳐서 기록
+
+/* 주소 p가 가리키는 워드(4바이트) 읽기/쓰기 */
+#define GET(p)       (*(unsigned int *)(p))       // 해당 주소의 값 읽기
+#define PUT(p, val)  (*(unsigned int *)(p) = (val)) // 해당 주소에 값 저장
+
+/* 헤더 또는 풋터에서 블록의 크기와 할당 비트 추출 */
+#define GET_SIZE(p)  (GET(p) & ~0x7)   // 하위 3비트 제외(000...111 제거) → 블록 크기
+#define GET_ALLOC(p) (GET(p) & 0x1)    // 가장 마지막 비트(LSB)만 추출 → 0: free, 1: allocated
+
+/* 주어진 블록 포인터(bp)로 헤더와 풋터 주소 계산 */
+#define HDRP(bp)       ((char *)(bp) - WSIZE)                 // 현재 블록의 헤더 주소
+#define FTRP(bp)       ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE) // 현재 블록의 풋터 주소
+
+/* 이전, 다음 블록의 포인터 계산 */
+#define NEXT_BLKP(bp)  ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))  
+// 현재 블록 크기만큼 더해서 다음 블록으로 이동
+#define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))  
+// 이전 블록의 풋터에서 크기를 읽어서 이전 블록으로 이동
+
 
 /*
  * mm_init - initialize the malloc package.
