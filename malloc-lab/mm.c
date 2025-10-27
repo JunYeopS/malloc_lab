@@ -72,6 +72,9 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))  
 // 이전 블록의 풋터에서 크기를 읽어서 이전 블록으로 이동
 
+static char *heap_listp = 0; // 힙의 시작 포인터
+
+
 static void *coalesce(void *bp)
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); // 이전 블록의 할당 상태
@@ -133,13 +136,9 @@ static void *extend_heap(size_t words)
 }
 
 
-/*
- * mm_init - initialize the malloc package.
- */
+/* mm_init - initialize the malloc package. */
 int mm_init(void)
 {
-    char *heap_listp;
-
     // 1. 힙에 4워드(16바이트) 공간 요청: padding + prologue header/footer + epilogue header
     if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
         return -1;
@@ -151,27 +150,74 @@ int mm_init(void)
     PUT(heap_listp + (3 * WSIZE), PACK(0, 1));      // Epil header (크기 0, 할당됨)
     heap_listp += (2 * WSIZE);                      // payload 시작 지점(bp) 설정
 
-    // 3. 초기 힙을 CHUNKSIZE 만큼 확장 (가용 블록 하나 만들기)
+    // 3. 초기 힙을 CHUNKSIZE 만큼 확장 (free block 하나 만들기)
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
     return 0;
 }
 
-/*
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
- */
+static void *find_fit(size_t asize)
+{
+    void *bp;
+
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            return bp;  // 첫 번째로 맞는 free block 반환
+        }
+    }
+    return NULL; // 못 찾으면 NULL
+}
+
+static void place(void *bp, size_t asize)
+{
+    size_t csize = GET_SIZE(HDRP(bp)); // 현재 블록 전체 크기
+
+    if ((csize - asize) >= (2 * DSIZE)) { // 남는 공간이 충분하면 분할
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+        bp = NEXT_BLKP(bp);
+        PUT(HDRP(bp), PACK(csize - asize, 0));
+        PUT(FTRP(bp), PACK(csize - asize, 0));
+    } else { // 아니면 통째로 사용
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+    }
+}
+
+/* mm_malloc - Allocate a block by incrementing the brk pointer.
+ * Always allocate a block whose size is a multiple of the alignment. */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
+    size_t asize;      // 정렬된 블록 크기
+    size_t extendsize; // 힙 확장 시 크기
+    char *bp;
+
+    if (size == 0)
         return NULL;
+
+    // 최소 블록 크기 보장 + 8바이트 정렬
+    if (size <= DSIZE)
+        asize = 2 * DSIZE;
     else
-    {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+        asize = ALIGN(size + 2 * WSIZE);
+
+    // 가용 블록 탐색
+    if ((bp = find_fit(asize)) != NULL) {
+        place(bp, asize);
+        return bp;
     }
+
+    // 못 찾으면 힙 확장
+    // extendsize = MAX(asize, CHUNKSIZE);
+    if (asize < CHUNKSIZE){
+        extendsize = CHUNKSIZE;
+    }else extendsize = asize;
+
+
+    if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
+        return NULL;
+    place(bp, asize);
+    return bp;
 }
 
 /*
