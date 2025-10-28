@@ -51,7 +51,7 @@ team_t team = {
 #define DSIZE       8           // double word = 8바이트 (정렬 단위)
 
 /* 힙을 한 번 확장할 때 기본 크기 (초기 힙 크기 단위) */
-#define CHUNKSIZE   (1 << 12)   // 4096바이트 (4KB 단위로 힙 확장)
+#define CHUNKSIZE   (1 << 8)   // 4096바이트 (4KB 단위로 힙 확장)
 
 /* 크기와 할당 비트를 하나의 값으로 묶어서 저장 */
 #define PACK(size, alloc)  ((size) | (alloc))  
