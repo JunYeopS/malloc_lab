@@ -50,9 +50,6 @@ team_t team = {
 #define WSIZE       4           // word = 4바이트 (헤더/풋터 크기)
 #define DSIZE       8           // double word = 8바이트 (정렬 단위)
 
-/* 힙을 한 번 확장할 때 기본 크기 (초기 힙 크기 단위) */
-#define CHUNKSIZE   (1 << 8)   // 4096바이트 (4KB 단위로 힙 확장)
-
 /* 크기와 할당 비트를 하나의 값으로 묶어서 저장 */
 #define PACK(size, alloc)  ((size) | (alloc))  
 // ex) 헤더에 크기(size)와 할당 여부(alloc: 0 또는 1)를 합쳐서 기록
@@ -176,7 +173,7 @@ int mm_init(void)
     free_listp = NULL;
 
     // 3. 초기 힙을 CHUNKSIZE 만큼 확장 (free block 하나 만들기)
-    if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
+    if (extend_heap(MINBLK / WSIZE) == NULL)
         return -1;
     return 0;
 }
@@ -235,8 +232,8 @@ void *mm_malloc(size_t size)
         return bp;
     }
 
-    // 못 찾으면 힙 확장
-    size_t extendsize = (asize < CHUNKSIZE) ? CHUNKSIZE : asize;
+    // 필요한 만큼만 확장
+    size_t extendsize = ALIGN(asize);
     if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
         return NULL;
 
