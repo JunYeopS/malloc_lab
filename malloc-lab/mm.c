@@ -161,7 +161,6 @@ static void *extend_heap(size_t words)
     return bp; // 인접 free block과 병합 후 반환
 }
 
-
 /* mm_init - initialize the malloc package. */
 int mm_init(void)
 {
@@ -185,14 +184,17 @@ int mm_init(void)
 static void *find_fit(size_t asize)
 {
     void *bp;
-
+    void *best_p = NULL;
     for (bp = free_listp; bp != NULL; bp = GET_NEXT(bp)) {
 
         if (GET_ALLOC(HDRP(bp)) == 0 && asize <= GET_SIZE(HDRP(bp))) {
-            return bp;
+            // bestp가 NULL일때 첫 번째 후보를 설정하는 단계
+            if (best_p == NULL || GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_p))) {
+                    best_p = bp;
+                }
         }
     }
-    return NULL;
+    return best_p;
 }
 
 static void place(void *bp, size_t asize)
@@ -270,7 +272,6 @@ static void remove_free_block(void *bp) {
     if (next) SET_PRED(next, prev);
 }
 
-
 /*
  * mm_free - Freeing a block does nothing.
  */
@@ -296,7 +297,6 @@ void *mm_realloc(void *ptr, size_t size)
     if (ptr == NULL) return mm_malloc(size);
     if (size == 0)   { mm_free(ptr); return NULL; }
 
-    void *oldptr = ptr;
     void *newptr;
     size_t copySize;
 
